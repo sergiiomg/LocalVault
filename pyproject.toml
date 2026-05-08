@@ -1,0 +1,12 @@
+[project]
+name = "local-vault"
+version = "0.1.0"
+description = "A local-first encrypted password manager built with Python."
+readme = "README.md"
+requires-python = ">=3.12"
+authors = [
+    { name = "Sergiio" }
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
