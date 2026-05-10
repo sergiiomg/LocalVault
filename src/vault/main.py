@@ -19,6 +19,12 @@ from vault.vault_file import (
     save_vault
 )
 
+from vault.password_generator import(
+    DEFAULT_PASSWORD_LENGTH,
+    PasswordGenerationError,
+    generate_password
+)
+
 # Evitamos duplicar código para pedir la contraseña maestra. Se centraliza todo en una función.
 def ask_master_password() -> str:
     return getpass("Contraseña maestra:")
@@ -90,7 +96,22 @@ def handle_add(args: argparse.Namespace) -> None:
 
     service = input("Service: ").strip()
     username = input("Username: ").strip()
-    password = input("Password: ").strip()
+    
+    if args.generate:
+        try:
+            password = generate_password(
+                length=args.length,
+                use_symbols=not args.no_symbols,
+                avoid_ambiguous=not args.allow_ambiguous,
+            )
+        except PasswordGenerationError as error:
+            print(f"Error: {error}")
+            return
+
+        print(f"Generated password: {password}")
+    else:
+        password = getpass("Password: ").strip()
+
     url = input("URL (optional): ").strip()
     notes = input("Notes (optional): ").strip()
 
@@ -226,6 +247,19 @@ def handle_delete(args: argparse.Namespace) -> None:
     print(f"Entrada para {service} ({username}) eliminada exitosamente.")
 
 
+def handle_generate(args: argparse.Namespace) -> None:
+    try:
+        password = generate_password(
+            length= args.length,
+            use_symbols= not args.no_symbols,
+            avoid_ambiguous= not args.allow_ambiguous,
+        )
+    except PasswordGenerationError as error:
+        print(f"Error: {error}")
+        return
+    
+    print(f"Generated password: {password}")
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog= "vault",
@@ -258,12 +292,33 @@ def build_parser() -> argparse.ArgumentParser:
     open_parser.set_defaults(func=handle_open)
 
     add_parser = subparsers.add_parser(
-        "add",
-        help="Add a new password entry",
+    "add",
+    help="Add a new password entry",
     )
     add_parser.add_argument(
         "vault_path",
         help="Path to the vault file",
+    )
+    add_parser.add_argument(
+        "--generate",
+        action="store_true",
+        help="Generate a strong password instead of typing one manually",
+    )
+    add_parser.add_argument(
+        "--length",
+        type=int,
+        default=DEFAULT_PASSWORD_LENGTH,
+        help=f"Generated password length. Default: {DEFAULT_PASSWORD_LENGTH}",
+    )
+    add_parser.add_argument(
+        "--no-symbols",
+        action="store_true",
+        help="Generate password without symbols",
+    )
+    add_parser.add_argument(
+        "--allow-ambiguous",
+        action="store_true",
+        help="Allow ambiguous characters like I, l, 1, O and 0",
     )
     add_parser.set_defaults(func=handle_add)
 
@@ -304,6 +359,28 @@ def build_parser() -> argparse.ArgumentParser:
         help="Search query, for example: github",
     )
     delete_parser.set_defaults(func=handle_delete)
+
+    generate_parser = subparsers.add_parser(
+    "generate",
+    help="Generate a strong password",
+    )
+    generate_parser.add_argument(
+        "--length",
+        type=int,
+        default=DEFAULT_PASSWORD_LENGTH,
+        help=f"Password length. Default: {DEFAULT_PASSWORD_LENGTH}",
+    )
+    generate_parser.add_argument(
+        "--no-symbols",
+        action="store_true",
+        help="Generate password without symbols",
+    )
+    generate_parser.add_argument(
+        "--allow-ambiguous",
+        action="store_true",
+        help="Allow ambiguous characters like I, l, 1, O and 0",
+    )
+    generate_parser.set_defaults(func=handle_generate)
 
     return parser
 
