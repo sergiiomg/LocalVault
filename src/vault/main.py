@@ -25,6 +25,13 @@ from vault.password_generator import(
     generate_password
 )
 
+from vault.clipboard import (
+    DEFAULT_TIMEOUT,
+    ClipboardError,
+    clear_clipboard_if_unchanged,
+    copy_to_clipboard,
+)
+
 # Evitamos duplicar código para pedir la contraseña maestra. Se centraliza todo en una función.
 def ask_master_password() -> str:
     return getpass("Contraseña maestra:")
@@ -44,6 +51,26 @@ def unlock_vault(vault_path: Path) -> tuple[dict, str] | None:
         return None
     
     return vault_data, master_password
+
+def copy_password_safely(password: str, clear_after: int) -> None:
+    # Copia la contraseña al portapapeles. Expera X segundos. Limpia el portapapeles si el contenido no ha cambiado.
+    try:
+        copy_to_clipboard(password)
+    except ClipboardError as error:
+        print(f"Error: {error}")
+        return
+    
+    print(f"Contraseña copiada al portapapeles.")
+    print(f"El portapapeles se limpiará automáticamente después de {clear_after} segundos, si no se ha modificado.")
+
+    try:
+        clear_clipboard_if_unchanged(password, clear_after)
+    except ClipboardError as error:
+        print(f"Error: {error}")
+        return
+    
+    if clear_after > 0:
+        print("El portapapeles ha sido limpiado.")
 
 def handle_create (args: argparse.Namespace) -> None:
     vault_path = Path(args.vault_path)
@@ -108,7 +135,13 @@ def handle_add(args: argparse.Namespace) -> None:
             print(f"Error: {error}")
             return
 
-        print(f"Generated password: {password}")
+        if args.show_password:
+            print(f"Generated password: {password}")
+        else:
+            print("Generated password: hidden")
+        
+        if args.copy:
+            copy_password_safely(password, args.clear_after)
     else:
         password = getpass("Password: ").strip()
 
@@ -194,11 +227,20 @@ def handle_get(args: argparse.Namespace) -> None:
     print("-------------------")
     print(f"Service: {entry.get('service', '')}")
     print(f"Username: {entry.get('username', '')}")
-    print(f"Password: {entry.get('password', '')}")
     print(f"URL: {entry.get('url', '')}")
     print(f"Notes: {entry.get('notes', '')}")
     print(f"Created at: {entry.get('created_at', '')}")
     print(f"Updated at: {entry.get('updated_at', '')}")
+
+    password = entry.get("password", "")
+
+    if args.show_password:
+        print(f"\nLa contraseña es: {password}")
+    elif args.copy:
+        copy_password_safely(password, args.clear_after)
+    else:
+        print("Contraseña oculta.")
+        print("Usa --show-password para mostrarla o --copy para copiarla al portapapeles.")
     
 def handle_delete(args: argparse.Namespace) -> None:
     vault_path = Path(args.vault_path)
@@ -229,12 +271,13 @@ def handle_delete(args: argparse.Namespace) -> None:
     service = entry.get("service", "")
     username = entry.get("username", "")
 
-    print(f"¿Estás seguro de que deseas eliminar la entrada para {service} ({username})?")
-    confirmation = input("Escribe 'yes' para confirmar: ").strip().lower()
+    if not args.yes:
+        print(f"You are about to delete: {service} ({username})")
+        confirmation = input("Are you sure? [y/N]: ").strip().lower()
 
-    if confirmation != "yes":
-        print("Eliminación cancelada.")
-        return
+        if confirmation != "y":
+            print("Delete cancelled.")
+            return
     
     was_deleted = delete_entry(vault_data, entry["id"])
 
@@ -320,6 +363,22 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Allow ambiguous characters like I, l, 1, O and 0",
     )
+    add_parser.add_argument(
+        "--show-password",
+        action="store_true",
+        help="Display generated password in the terminal",
+    )
+    add_parser.add_argument(
+        "--copy",
+        action="store_true",
+        help="Copy generated password to clipboard",
+    )
+    add_parser.add_argument(
+        "--clear-after",
+        type=int,
+        default=DEFAULT_TIMEOUT,
+        help=f"Seconds before clearing clipboard. Default: {DEFAULT_TIMEOUT}",
+    )
     add_parser.set_defaults(func=handle_add)
 
     list_parser = subparsers.add_parser(
@@ -344,6 +403,22 @@ def build_parser() -> argparse.ArgumentParser:
         "query",
         help="Search query, for example: github",
     )
+    get_parser.add_argument(
+    "--copy",
+    action="store_true",
+    help="Copy password to clipboard instead of displaying it",
+    )
+    get_parser.add_argument(
+        "--show-password",
+        action="store_true",
+        help="Display password in the terminal",
+    )
+    get_parser.add_argument(
+        "--clear-after",
+        type=int,
+        default=DEFAULT_TIMEOUT,
+        help=f"Seconds before clearing clipboard. Default: {DEFAULT_TIMEOUT}",
+    )
     get_parser.set_defaults(func=handle_get)
 
     delete_parser = subparsers.add_parser(
@@ -357,6 +432,12 @@ def build_parser() -> argparse.ArgumentParser:
     delete_parser.add_argument(
         "query",
         help="Search query, for example: github",
+    )
+    delete_parser.add_argument(
+        "-y",
+        "--yes",
+        action="store_true",
+        help="Delete without asking for confirmation",
     )
     delete_parser.set_defaults(func=handle_delete)
 
