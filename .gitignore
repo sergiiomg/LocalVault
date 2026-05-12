@@ -28,3 +28,7 @@ Thumbs.db
 # Local VAULT files
 *.vault
 *.localpass
+
+# VAULT backups
+.vault_backups/
+*.bak

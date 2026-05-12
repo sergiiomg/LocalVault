@@ -1,6 +1,7 @@
 import argparse
 from getpass import getpass
 from pathlib import Path
+from vault.audit import audit_vault
 
 from vault.entries import(
     add_entry,
@@ -12,6 +13,7 @@ from vault.entries import(
 
 from vault.vault_file import (
     InvalidMasterPasswordError,
+    InvalidVaultFileError,
     VaultAlreadyExistsError,
     VaultNotFoundError,
     create_vault,
@@ -47,7 +49,10 @@ def unlock_vault(vault_path: Path) -> tuple[dict, str] | None:
         print(f"Error: vault no encontrado en {vault_path}")
         return None
     except InvalidMasterPasswordError:
-        print("Error: contraseña maestra inválida.")
+        print("Error: contraseña maestra inválida o archivo corrupto.")
+        return None
+    except InvalidVaultFileError as error:
+        print(f"Error: el archivo del vault es inválido. Detalles: {error}")
         return None
     
     return vault_data, master_password
@@ -303,6 +308,28 @@ def handle_generate(args: argparse.Namespace) -> None:
     
     print(f"Generated password: {password}")
 
+def handle_audit(args: argparse.Namespace) -> None:
+    vault_path = Path(args.vault_path)
+
+    unlocked = unlock_vault(vault_path)
+
+    if unlocked is None:
+        return
+    
+    vault_data, _master_password = unlocked
+
+    warnings = audit_vault(vault_data)
+
+    if not warnings:
+        print("No se encontraron problemas de seguridad en el vault.")
+        return
+    
+    print("Advertencias de seguridad:")
+    print("-----------------------")
+
+    for index, warning in enumerate(warnings, start=1):
+        print(f"{index}. {warning}")
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog= "vault",
@@ -462,6 +489,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="Allow ambiguous characters like I, l, 1, O and 0",
     )
     generate_parser.set_defaults(func=handle_generate)
+
+    audit_parser = subparsers.add_parser(
+    "audit",
+    help="Audit vault entries for security issues",
+    )
+    audit_parser.add_argument(
+        "vault_path",
+        help="Path to the vault file",
+    )
+    audit_parser.set_defaults(func=handle_audit)
 
     return parser
 
