@@ -20,8 +20,9 @@ def find_empty_usernames(entries: list[dict[str, Any]]) -> list[str]:
     warnings = []
 
     for entry in entries:
-        if not entry.get("username"):
-            warnings.append(f"Entry '{entry.get('service', 'Unknown Service')}' has an empty username.")
+        if not entry.get("username", "").strip():
+            service = entry.get("service", "Unknown service")
+            warnings.append(f"{service}: username/email is empty.")
     
     return warnings
 
@@ -34,7 +35,10 @@ def find_weak_passwords(entries: list[dict[str, Any]]) -> list[str]:
         password = entry.get("password", "")
 
         if len(password) < MIN_RECOMMENDED_PASSWORD_LENGTH:
-            warnings.append(f"Entry '{service}' has a weak password (length {len(password)}). Consider using a password of at least {MIN_RECOMMENDED_PASSWORD_LENGTH} characters.")
+            warnings.append(
+                f"{service}: password is shorter than "
+                f"{MIN_RECOMMENDED_PASSWORD_LENGTH} characters."
+            )
 
         if password.lower() == password or password.upper() == password:
             warnings.append(
@@ -62,6 +66,7 @@ def find_reused_passwords(entries: list[dict[str, Any]]) -> list[str]:
         if len(services) > 1:
             service_list = ", ".join(services)
             warnings.append(f"Reused password detected in: {service_list}.")
+            
     return warnings
 
 def find_missing_urls(entries: list[dict[str, Any]]) -> list[str]:
@@ -70,6 +75,7 @@ def find_missing_urls(entries: list[dict[str, Any]]) -> list[str]:
 
     for entry in entries:
         if not entry.get("url", "").strip():
-            warnings.append(f"Entry '{entry.get('service', 'Unknown Service')}' is missing a URL.")
+            service = entry.get("service", "Unknown Service")
+            warnings.append(f"{service}: URL is missing.")
     
     return warnings

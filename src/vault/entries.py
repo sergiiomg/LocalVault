@@ -31,7 +31,7 @@ def create_entry(
 
 def get_entries(vault_data: dict[str, Any]) -> list[dict[str, Any]]:
     # Devuelve la lista de entradas del vault
-    return vault_data.get("entries", [])
+    return vault_data.setdefault("entries", [])
 
 def add_entry(vault_data: dict[str, Any], entry: dict[str, Any]) -> list[dict[str, Any]]:
     # Añade una nueva entrada al vault. No guarda en el disco, solo modifica datos en memoria.
