@@ -2,6 +2,7 @@ import argparse
 from getpass import getpass
 from pathlib import Path
 from vault.audit import audit_vault
+from vault.ui import run_app
 
 from vault.entries import(
     add_entry,
@@ -330,6 +331,9 @@ def handle_audit(args: argparse.Namespace) -> None:
     for index, warning in enumerate(warnings, start=1):
         print(f"{index}. {warning}")
 
+def handle_gui(args: argparse.Namespace) -> None:
+    run_app()
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog= "vault",
@@ -499,6 +503,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Path to the vault file",
     )
     audit_parser.set_defaults(func=handle_audit)
+
+    gui_parser = subparsers.add_parser(
+    "gui",
+    help="Open the VAULT graphical interface",
+    )
+    gui_parser.set_defaults(func=handle_gui)
 
     return parser
 
